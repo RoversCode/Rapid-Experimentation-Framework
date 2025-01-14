@@ -1,21 +1,34 @@
 data_conf:
     queue_configs:
         - name: "strong"
-          address: ["192.168.15.87", 12346]
+          address: ["192.168.15.87", 8124]
           authkey: "liujunjieabracadabra"
-          queue_name: "get_strong_queue"
+          queue_name: "abnormal_detection_1"
           weight: 0.88  # 采样权重
           
-        - name: "emilia"
-          address: ["192.168.15.87", 12349] 
-          authkey: "liujunjieabracadabra"
-          queue_name: "get_emilia_queue"
-          weight: 0.12
-          
+        # - name: "emilia"
+        #   address: ["192.168.15.87", 12349] 
+        #   authkey: "liujunjieabracadabra"
+        #   queue_name: "get_emilia_queue"
+        #   weight: 0.12
     num_workers: 1
     pin_memory: true
     batch_size: 16
-    max_frames: 1024
+    max_frames: 3000
+    batch_type: "static"  # dynamic
+    buffer_size: 100
+    max_duration: 30   # 30s
+    target_sample_rate: 16000  # 模型需要的采样率
+
+    mel_conf:
+        n_fft: 512
+        num_mels: 80
+        sampling_rate: !ref <target_sample_rate>
+        hop_size: 160
+        win_size: 512
+        fmin: 0
+        fmax: 8000
+        center: False
 
 train_env: # 训练环境配置
   env:
@@ -29,6 +42,7 @@ train_env: # 训练环境配置
 
 # train conf
 train_conf:
+    queue_flag: true  # 数据读取队列
     ckpt_path: ''  # 检查点路径
     seed: 1998
     fp16: false  # 混合精度
@@ -54,4 +68,4 @@ train_conf:
         reduction: mean
     clip_grad: 5  # 梯度裁剪  >0时启用
     max_keep_ckpts: 3        # 最多保留的检查点数量，0或负数表示保留所有
-    save_per_step: 15000    # 大于0，根据步数保存模型；小于0，根据epoch保存模型
+    save_per_step: 200    # 大于0，根据步数保存模型；小于0，根据epoch保存模型

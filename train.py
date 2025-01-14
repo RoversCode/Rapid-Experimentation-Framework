@@ -13,6 +13,7 @@
 import os
 
 os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
 import yaml
 from pathlib import Path
@@ -24,6 +25,7 @@ from utils.train_utils import (
     init_distributed,
 )
 from trainers.trainer import Trainer
+from hyperpyyaml import load_hyperpyyaml
 
 
 def main(exp_name):
@@ -31,8 +33,13 @@ def main(exp_name):
     config_path = Path(__file__).parent / "configs" / "train_config.yaml"
     with open(config_path, "r") as f:
         args = yaml.safe_load(f)
+    components_config = Path(__file__).parent / "configs" / "components.yaml"
+    with open(components_config, "r") as f:
+        components = load_hyperpyyaml(f)
     args = RecursiveMunch(args)
+    components = RecursiveMunch(components)
     args.train_conf.exp_name = exp_name
+    args.components = components
     # 初始化环境
     init_env(args)
 
@@ -69,6 +76,6 @@ def main(exp_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exp_name", default="exp", help="实验名称")
+    parser.add_argument("--exp_name", default="base", help="实验名称")
     args = parser.parse_args()
     main(args.exp_name)

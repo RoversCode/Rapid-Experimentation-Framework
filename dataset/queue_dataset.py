@@ -111,10 +111,11 @@ class QueueDataset(IterableDataset):
     def _register_queues(self):
         """注册所有队列"""
         for config in self.queue_configs:
-            name = config["name"]
+            name = config.name
+            logger.info(f"Registering queue: {name}")
             # 注册获取队列的方法
-            QueueManager.register(config["queue_name"])
-            self.weights.append(config.get("weight", 1.0))
+            QueueManager.register(config.queue_name)
+            self.weights.append(config.weight)
 
     def _normalize_weights(self):
         """归一化权重"""
@@ -226,6 +227,7 @@ class Processor(IterableDataset):
 def QueueDatasetPipeline(
     queue_configs: List[Dict],
     data_pipeline: Optional[List] = None,
+    data_conf: Dict = None,
     mode: str = "train",
     shuffle: bool = True,
     partition: bool = True,
@@ -256,6 +258,6 @@ def QueueDatasetPipeline(
 
     # 应用数据处理流水线
     for func in data_pipeline:
-        dataset = Processor(dataset, func, mode=mode)
+        dataset = Processor(dataset, func, data_conf=data_conf, mode=mode)
 
     return dataset
