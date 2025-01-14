@@ -1,0 +1,14 @@
+# 模型架构配置写在这里
+
+# fixed params
+sample_rate: 16000
+
+resample: !name:dataset.processor.resample
+    resample_rate: !ref <sample_rate>
+    min_sample_rate: 16000
+
+
+
+data_pipeline: [
+    !ref <resample>
+]

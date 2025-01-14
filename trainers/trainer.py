@@ -6,11 +6,13 @@
 @Author  :   ChengHee
 @Version :   1.0
 @Contact :   liujunjie199810@gmail.com
-@Desc    :   None
+@Desc    :   训练器
 """
 
 # here put the import lib
 import torch
+import torch.distributed as dist
+import datetime
 from models.tony import Tony
 from utils.optimizer import create_optimizer
 from utils.scheduler import create_scheduler
@@ -20,11 +22,8 @@ from torch.cuda.amp import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from contextlib import nullcontext
 from utils.train_utils import check_distributed_sync
-from utils.train_utils import log_per_step
+from utils.train_utils import log_per_step, init_dataset_and_dataloader
 from pathlib import Path
-import torch.distributed as dist
-from torch.utils.data import DataLoader
-from datasets.queue_dataset import QueueDatasetPipeline
 
 
 class Trainer:
@@ -60,26 +59,7 @@ class Trainer:
 
     def build_dataloader(self):
         """构建数据加载器"""
-        train_dataset = QueueDatasetPipeline(
-            queue_configs=self.args.data_conf.queue_configs,
-            data_pipeline=self.data_pipeline,
-            mode="train",
-            shuffle=True,
-            partition=True,
-            max_retries=5,
-            retry_delay=5,
-            buffer_size=100,
-        )
-        
-        train_data_loader = DataLoader(
-            train_dataset,
-            batch_size=None,
-            pin_memory=self.args.data_conf.pin_memory,
-            num_workers=self.args.data_conf.num_workers,
-            prefetch_factor=2,
-        )
-        
-        return train_data_loader, train_dataset, None, None
+        return init_dataset_and_dataloader(self.args)
 
     def build_optimizer(self, model):
         """构建优化器"""
@@ -126,9 +106,6 @@ class Trainer:
         # 混合精度
         self.scaler = GradScaler(enabled=self.args.train_conf.fp16)
         """训练循环"""
-        import torch.distributed as dist
-        import datetime
-
         for epoch in range(self.epoch + 1, self.args.train_conf.max_epochs):
             train_dataset.set_epoch(epoch)
             dist.barrier()  # 确保所有进程都完成了上一个epoch的工作,并准备好开始新的epoch
@@ -141,12 +118,12 @@ class Trainer:
 
     def train_one_epoc(self, group_join):
         """单个epoch训练"""
-        self.log_info(
+        self.logger.info(
             "Epoch {} TRAIN info lr {} rank {}".format(
                 self.epoch, self.scheduler.get_last_lr()[0], self.rank
             )
         )
-        self.log_info(
+        self.logger.info(
             "using accumulate grad, new batch size is {} times larger than before".format(
                 self.args.train_conf.accum_grad
             )

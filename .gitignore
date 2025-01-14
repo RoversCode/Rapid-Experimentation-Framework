@@ -3,3 +3,5 @@ modeldata
 notebooks
 ckpts
 logs
+__pycache__
+data_process

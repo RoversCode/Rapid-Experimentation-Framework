@@ -20,6 +20,8 @@ from typing import Any, Dict
 from munch import Munch
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
+from torch.utils.data import DataLoader
+from dataset.queue_dataset import QueueDatasetPipeline
 
 
 logger = logging.getLogger(__name__)
@@ -274,26 +276,25 @@ def log_per_step(writer, args, step, epoch):
         logger.info(log_str)
 
 
-from datasets.queue_dataset import QueueDatasetPipeline
-from torch.utils.data import DataLoader
-
-def init_dataset_and_dataloader(args, configs):
+def init_dataset_and_dataloader(args):
     """
     调用train_data_loader的__iter__方法,获取数据迭代器。
     数据迭代器通过调用train_dataset的__iter__方法,递归地调用数据处理流水线中的所有Processor对象的__iter__方法,对数据进行逐步处理。
     处理后的数据通过数据迭代器返回给训练循环。
     训练循环通过调用next()方法或for循环,逐个获取处理后的数据样本,直到遍历完所有数据。
     """
-    if args.train_conf.exp_name.endswith("base"):
+    if args.train_conf.queue_flag:
         # args 启动参数   configs 配置文件
         train_dataset = QueueDatasetPipeline(
-            data_pipeline=data_pipeline,
+            queue_configs=args.data_conf.queue_configs,
+            data_pipeline=args.components.data_pipeline,
+            data_conf=args.data_conf,
             mode="train",
             shuffle=True,
             partition=True,
             max_retries=5,
             retry_delay=5,
-            buffer_size=100,
+            buffer_size=args.data_conf.buffer_size,
         )
         # cv_dataset = Dataset(
         #     args.cv_data,
@@ -307,9 +308,9 @@ def init_dataset_and_dataloader(args, configs):
         train_data_loader = DataLoader(
             train_dataset,
             batch_size=None,
-            pin_memory=args.pin_memory,
-            num_workers=args.num_workers,
-            prefetch_factor=args.prefetch,
+            pin_memory=args.data_conf.pin_memory,
+            num_workers=args.data_conf.num_workers,
+            prefetch_factor=args.data_conf.prefetch,
         )
         # cv_data_loader = DataLoader(
         #     cv_dataset,
