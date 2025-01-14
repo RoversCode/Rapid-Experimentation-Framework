@@ -1,0 +1,57 @@
+data_conf:
+    queue_configs:
+        - name: "strong"
+          address: ["192.168.15.87", 12346]
+          authkey: "liujunjieabracadabra"
+          queue_name: "get_strong_queue"
+          weight: 0.88  # 采样权重
+          
+        - name: "emilia"
+          address: ["192.168.15.87", 12349] 
+          authkey: "liujunjieabracadabra"
+          queue_name: "get_emilia_queue"
+          weight: 0.12
+          
+    num_workers: 1
+    pin_memory: true
+    batch_size: 16
+    max_frames: 1024
+
+train_env: # 训练环境配置
+  env:
+    MASTER_ADDR: "localhost"
+    MASTER_PORT: 10086
+    WORLD_SIZE: 1
+    LOCAL_RANK: 0
+    RANK: 0
+  bf16_run: false
+  fp16_run: false
+
+# train conf
+train_conf:
+    ckpt_path: ''  # 检查点路径
+    seed: 1998
+    fp16: false  # 混合精度
+    distributed: false  # 单卡训练
+    dist_backend: 'nccl'
+    max_epochs: 100
+    optim: adam
+    optim_conf:
+        lr: 0.0001   # sft ->  1e-5
+    scheduler: warmup_cosine  # 调度器类型
+    scheduler_conf:
+        warmup_steps: 1000    # 预热步数
+        min_lr: 1e-6         # 最小学习率
+    max_epoch: 200
+    grad_clip: 5
+    accum_grad: 2
+    log_interval: 100
+    save_per_step: 15000  # 大于0，根据步数保存模型；小于0，根据epoch保存模型
+    criterion: focal  # 损失函数类型
+    criterion_conf:
+        alpha: 0.25   # focal loss的alpha参数
+        gamma: 2.0    # focal loss的gamma参数
+        reduction: mean
+    clip_grad: 5  # 梯度裁剪  >0时启用
+    max_keep_ckpts: 3        # 最多保留的检查点数量，0或负数表示保留所有
+    save_per_step: 15000    # 大于0，根据步数保存模型；小于0，根据epoch保存模型
