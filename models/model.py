@@ -89,5 +89,6 @@ class AbnormalDetection(nn.Module):
 
         return logits
 
-    def infer(self, batch_dict):
+    def infer(self, speech_feat, speech_feat_len):
+        batch_dict = {"speech_feat": speech_feat, "speech_feat_len": speech_feat_len}
         return self.forward(batch_dict)
