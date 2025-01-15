@@ -1,3 +1,6 @@
+# fixed params
+target_sample_rate: 16000  # 模型需要的采样率: 16000
+
 data_conf:
     queue_configs:
         - name: "strong"
@@ -14,21 +17,30 @@ data_conf:
     num_workers: 1
     pin_memory: true
     batch_size: 16
-    max_frames: 3000
-    batch_type: "static"  # dynamic
+    prefetch: 10 # 预取因子
+
+    max_frames_in_batch: 2000
+    batch_type: "dynamic"  # dynamic  static
     buffer_size: 100
     max_duration: 30   # 30s
-    target_sample_rate: 16000  # 模型需要的采样率
-
+    sampling_rate: !ref <target_sample_rate>
     mel_conf:
         n_fft: 512
         num_mels: 80
-        sampling_rate: !ref <target_sample_rate>
         hop_size: 160
         win_size: 512
         fmin: 0
         fmax: 8000
         center: False
+    frontend_conf:
+      fs: 16000
+      window: hamming
+      n_mels: 80
+      frame_length: 25
+      frame_shift: 10
+      lfr_m: 7
+      lfr_n: 6
+      cmvn_file: null
 
 train_env: # 训练环境配置
   env:
@@ -43,7 +55,7 @@ train_env: # 训练环境配置
 # train conf
 train_conf:
     queue_flag: true  # 数据读取队列
-    ckpt_path: ''  # 检查点路径
+    ckpt_path: 'init_model.pt'  # 检查点路径
     seed: 1998
     fp16: false  # 混合精度
     distributed: false  # 单卡训练
@@ -52,20 +64,19 @@ train_conf:
     optim: adam
     optim_conf:
         lr: 0.0001   # sft ->  1e-5
-    scheduler: warmup_cosine  # 调度器类型
+    scheduler: warmuplr  # 调度器类型
     scheduler_conf:
-        warmup_steps: 1000    # 预热步数
+        warmup_steps: 100    # 预热步数
         min_lr: 1e-6         # 最小学习率
     max_epoch: 200
     grad_clip: 5
     accum_grad: 2
-    log_interval: 100
-    save_per_step: 15000  # 大于0，根据步数保存模型；小于0，根据epoch保存模型
+    log_interval: 5
     criterion: focal  # 损失函数类型
     criterion_conf:
-        alpha: 0.25   # focal loss的alpha参数
-        gamma: 2.0    # focal loss的gamma参数
+        alpha: 0.5   # focal loss的alpha参数
+        gamma: 1    # focal loss的gamma参数
         reduction: mean
-    clip_grad: 5  # 梯度裁剪  >0时启用
+    clip_grad: 0  # 梯度裁剪  >0时启用
     max_keep_ckpts: 3        # 最多保留的检查点数量，0或负数表示保留所有
-    save_per_step: 200    # 大于0，根据步数保存模型；小于0，根据epoch保存模型
+    save_per_step: 50    # 大于0，根据步数保存模型；小于0，根据epoch保存模型

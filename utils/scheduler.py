@@ -39,7 +39,7 @@ def create_scheduler(
     Args:
         optimizer: 优化器
         scheduler_type: 调度器类型，支持:
-            - warmup: 预热调度器
+            - warmuplr: 预热调度器
             - cosine: 余弦退火调度器
             - constant: 常数学习率
             - noam: Noam调度器
@@ -97,7 +97,7 @@ def create_scheduler(
         # 常数学习率
         scheduler = ConstantLR(optimizer)
         
-    elif scheduler_type == "warmup":
+    elif scheduler_type == "warmuplr":
         # 预热调度器
         scheduler = WarmupLR(
             optimizer,

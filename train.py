@@ -15,7 +15,6 @@ import os
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
-import yaml
 from pathlib import Path
 from utils.train_utils import (
     RecursiveMunch,
@@ -32,7 +31,7 @@ def main(exp_name):
     # 加载配置
     config_path = Path(__file__).parent / "configs" / "train_config.yaml"
     with open(config_path, "r") as f:
-        args = yaml.safe_load(f)
+        args = load_hyperpyyaml(f)
     components_config = Path(__file__).parent / "configs" / "components.yaml"
     with open(components_config, "r") as f:
         components = load_hyperpyyaml(f)

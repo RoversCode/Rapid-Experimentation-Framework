@@ -1,14 +1,45 @@
-# 模型架构配置写在这里
-
 # fixed params
 sample_rate: 16000
 
+# 模型架构配置写在这里
+encoder: SenseVoiceEncoderSmall
+encoder_conf:
+    output_size: 512
+    attention_heads: 4
+    linear_units: 2048
+    num_blocks: 50
+    tp_blocks: 20
+    dropout_rate: 0.1
+    positional_dropout_rate: 0.1
+    attention_dropout_rate: 0.1
+    input_layer: pe
+    pos_enc_class: SinusoidalPositionEncoder
+    normalize_before: true
+    kernel_size: 11
+    sanm_shfit: 0
+    selfattention_layer_type: sanm
+
+# 数据管道
+filter: !name:dataset.processor.filter
+
 resample: !name:dataset.processor.resample
-    resample_rate: !ref <sample_rate>
-    min_sample_rate: 16000
 
+compute_fbank: !name:dataset.processor.compute_fbank
 
+shuffle: !name:dataset.processor.shuffle
+
+sort: !name:dataset.processor.sort
+    sort_size: 50  # sort_size should be less than shuffle_size
+
+batch: !name:dataset.processor.batch
+padding: !name:dataset.processor.padding
 
 data_pipeline: [
-    !ref <resample>
+    !ref <filter>,
+    !ref <resample>,
+    !ref <compute_fbank>,
+    !ref <shuffle>,
+    !ref <sort>,
+    !ref <batch>,
+    !ref <padding>
 ]

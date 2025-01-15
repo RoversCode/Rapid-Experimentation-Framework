@@ -68,30 +68,30 @@ def init_logger(
     format="%(asctime)s %(levelname)s %(message)s",
     third_party_log_level=logging.WARNING,
 ):
-    """初始化日志配置
-
-    Args:
-        log_file: 日志文件路径,不指定则只输出到控制台
-        log_level: 日志级别
-        format: 日志格式
-        third_party_log_level: 第三方库的日志级别
-    """
-    # 获取根logger
+    """初始化日志配置"""
+    # 获取根logger并清除现有的处理器
     logger = logging.getLogger()
-
-    # 配置第三方库日志级别
-    logging.getLogger("matplotlib").setLevel(third_party_log_level)
-
-    # 配置基础日志
-    logging.basicConfig(level=log_level, format=format)
-
+    logger.handlers.clear()
+    
+    # 设置logger的级别
+    logger.setLevel(log_level)
+    
+    # 创建并添加控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(logging.Formatter(format))
+    logger.addHandler(console_handler)
+    
     # 添加文件处理器
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(log_level)
         file_handler.setFormatter(logging.Formatter(format))
         logger.addHandler(file_handler)
-
+    
+    # 配置第三方库日志级别
+    logging.getLogger("matplotlib").setLevel(third_party_log_level)
+    
     return logger
 
 
@@ -159,7 +159,9 @@ def wrap_cuda_model(args, model):
 
 
 def check_distributed_sync(group_join, args):
-    # 分布式训练中检测和处理不均匀的工作负载分配。
+    """@ljj: 分布式训练中检测和处理不均匀的工作负载分配。"""
+    if not args.train_conf.distributed:
+        return False
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     local_rank = int(os.environ.get("LOCAL_RANK", 0))
     rank = int(os.environ.get("RANK", 0))
@@ -186,32 +188,27 @@ def check_distributed_sync(group_join, args):
 
 def update_parameter_and_lr(model, optimizer, scheduler, scaler, args):
     """@ljj:更新参数和学习率"""
+    grad_norm = None
     if (args.train_conf.batch_idx + 1) % args.train_conf.accum_grad == 0:
         # Use mixed precision training
-        if scaler is not None:
-            scaler.unscale_(optimizer)
-            if args.train_conf.clip_grad > 0:
-                grad_norm = clip_grad_norm_(
-                    model.parameters(), args.train_conf.clip_grad
-                )  # @ljj: 梯度裁剪，视需要而定
-                if torch.isfinite(grad_norm):
-                    scaler.step(optimizer)
-            else:
+        scaler.unscale_(optimizer)
+        if args.train_conf.clip_grad > 0:
+            grad_norm = clip_grad_norm_(
+                model.parameters(), args.train_conf.clip_grad
+            )
+            if torch.isfinite(grad_norm):
                 scaler.step(optimizer)
-            scaler.update()
         else:
-            if args.train_conf.clip_grad > 0:
-                grad_norm = clip_grad_norm_(
-                    model.parameters(), args.train_conf.clip_grad
-                )
-                if torch.isfinite(grad_norm):
-                    optimizer.step()
-            else:
-                optimizer.step()
+            # 即使不裁剪梯度，也应检查梯度是否为有限值
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), float('inf'))
+            if torch.isfinite(grad_norm):
+                scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
         scheduler.step()
     args.train_conf.lr = optimizer.param_groups[0]["lr"]
-    args.train_conf.grad_norm = grad_norm
+    if grad_norm is not None:
+        args.train_conf.grad_norm = grad_norm
     return args
 
 
@@ -251,11 +248,6 @@ def log_per_step(writer, args, step, epoch):
             for k, v in loss_dict.items():
                 writer.add_scalar(f"{tag}/{k}", v, step + 1)
 
-            # 记录其他指标
-            if args.train_conf.metrics:
-                for k, v in args.train_conf.metrics.items():
-                    writer.add_scalar(f"{tag}/{k}", v, step + 1)
-
     # 按照指定间隔打印日志
     if (batch_idx + 1) % log_interval == 0:
         # 构建基础日志信息
@@ -264,11 +256,6 @@ def log_per_step(writer, args, step, epoch):
         # 添加所有损失值
         for name, value in loss_dict.items():
             log_str += f"{name} {value:.6f} "
-
-        # 添加其他指标
-        if args.train_conf.metrics:
-            for name, value in args.train_conf.metrics.items():
-                log_str += f"{name} {value:.6f} "
 
         # 添加rank信息
         log_str += f"rank {rank}"
@@ -312,6 +299,7 @@ def init_dataset_and_dataloader(args):
             num_workers=args.data_conf.num_workers,
             prefetch_factor=args.data_conf.prefetch,
         )
+        
         # cv_data_loader = DataLoader(
         #     cv_dataset,
         #     batch_size=None,
@@ -319,6 +307,6 @@ def init_dataset_and_dataloader(args):
         #     num_workers=args.num_workers,
         #     prefetch_factor=args.prefetch,
         # )
-        return train_dataset, train_data_loader, None, None
+        return train_data_loader, train_dataset, None, None
     else:  # TODO: @ljj: 微调走向
         pass
