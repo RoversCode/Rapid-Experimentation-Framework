@@ -131,7 +131,8 @@ class QueueDataset(IterableDataset):
                 try:
                     # 创建管理器实例
                     manager = QueueManager(
-                        address=config["address"], authkey=config["authkey"].encode()
+                        address=(config["address"][0], config["address"][1]),
+                        authkey=config["authkey"].encode(),
                     )
                     manager.connect()
 

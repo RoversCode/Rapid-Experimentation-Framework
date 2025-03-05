@@ -72,17 +72,17 @@ def get_speech_token(device_id):
     @torch.no_grad()
     def _get_speech_token():
         # Spk_membedding和Speech和Token的计算
-        option = onnxruntime.SessionOptions()
-        option.graph_optimization_level = (
-            onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-        )
-        option.intra_op_num_threads = 1
-        providers = [("CUDAExecutionProvider", {"device_id": int(device_id)})]
-        speech_tokenizer_session = onnxruntime.InferenceSession(
-            "/datadisk2/liujunjie/growth/audio/CosyVoice/pretrained_models/CosyVoice2-0.5B/speech_tokenizer_v2.onnx",
-            sess_options=option,
-            providers=providers,
-        )
+        # option = onnxruntime.SessionOptions()
+        # option.graph_optimization_level = (
+        #     onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        # )
+        # option.intra_op_num_threads = 1
+        # providers = [("CUDAExecutionProvider", {"device_id": int(device_id)})]
+        # speech_tokenizer_session = onnxruntime.InferenceSession(
+        #     "/datadisk2/liujunjie/growth/audio/CosyVoice/pretrained_models/CosyVoice2-0.5B/speech_tokenizer_v2.onnx",
+        #     sess_options=option,
+        #     providers=providers,
+        # )
         while True:
             try:
                 """
@@ -92,25 +92,25 @@ def get_speech_token(device_id):
                 "label": label,
                 """
                 sample = producer_queue.get()
-                start = time.time()
-                feat = whisper.log_mel_spectrogram(sample["audio_data"], n_mels=128)
-                if feat.dim() == 2:
-                    feat = feat.unsqueeze(0)
-                speech_token = speech_tokenizer_session.run(
-                    None,
-                    {
-                        speech_tokenizer_session.get_inputs()[0]
-                        .name: feat.detach()
-                        .cpu()
-                        .numpy(),
-                        speech_tokenizer_session.get_inputs()[1].name: np.array(
-                            [feat.shape[2]], dtype=np.int32
-                        ),
-                    },
-                )[0].flatten()
-                end = time.time()
-                print(f"speech token time: {end - start}")
-                sample["speech_token"] = speech_token
+                # start = time.time()
+                # feat = whisper.log_mel_spectrogram(sample["audio_data"], n_mels=128)
+                # if feat.dim() == 2:
+                #     feat = feat.unsqueeze(0)
+                # speech_token = speech_tokenizer_session.run(
+                #     None,
+                #     {
+                #         speech_tokenizer_session.get_inputs()[0]
+                #         .name: feat.detach()
+                #         .cpu()
+                #         .numpy(),
+                #         speech_tokenizer_session.get_inputs()[1].name: np.array(
+                #             [feat.shape[2]], dtype=np.int32
+                #         ),
+                #     },
+                # )[0].flatten()
+                # end = time.time()
+                # print(f"speech token time: {end - start}")
+                # sample["speech_token"] = speech_token
                 # 写成字节流
                 sppech_token_queue.put(sample)  # 取的speech token
             except Exception as e:
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     threading.Thread(target=make_batches).start()
 
     for i in range(6, 8):
-        for _ in range(3):
+        for _ in range(2):
             multiprocessing.Process(target=get_speech_token(i)).start()
             time.sleep(1)
 
