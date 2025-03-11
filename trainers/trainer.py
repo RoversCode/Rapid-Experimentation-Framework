@@ -169,16 +169,17 @@ class Trainer:
 
     def train_one_epoc(self, group_join):
         """单个epoch训练"""
-        self.logger.info(
-            "Epoch {} TRAIN info lr {} rank {}".format(
-                self.epoch, self.scheduler.get_last_lr()[0], self.rank
+        if self.rank == 0:
+            self.logger.info(
+                "Epoch {} TRAIN info lr {} rank {}".format(
+                    self.epoch, self.scheduler.get_last_lr()[0], self.rank
+                )
             )
-        )
-        self.logger.info(
-            "using accumulate grad, new batch size is {} times larger than before".format(
-                self.args.train_conf.accum_grad
+            self.logger.info(
+                "using accumulate grad, new batch size is {} times larger than before".format(
+                    self.args.train_conf.accum_grad
+                )
             )
-        )
         self.model.train()
 
         # 根据是否分布式训练选择合适的上下文管理器
@@ -364,8 +365,8 @@ class Trainer:
                 )
                 self._load_checkpoint_file(latest_checkpoint, model, optimizer)
                 return
-
-        self.logger.info(f"ljj：没有加载预训练模型，从头训练")
+        if self.rank == 0:
+            self.logger.info(f"ljj：没有加载预训练模型，从头训练")
 
     def _load_checkpoint_file(self, ckpt_path, model, optimizer):
         """实际加载检查点的辅助函数"""
@@ -380,7 +381,8 @@ class Trainer:
                 dict_state[k] = ckpt_state[k]
                 assert ckpt_state[k].shape == v.shape, (ckpt_state[k].shape, v.shape)
             except:
-                self.logger.warning(f"{k} shape mismatch")
+                if self.rank == 0:
+                    self.logger.warning(f"{k} shape mismatch")
                 dict_state[k] = v
 
         if hasattr(model, "module"):
