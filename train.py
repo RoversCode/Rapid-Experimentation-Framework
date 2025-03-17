@@ -15,6 +15,7 @@ import os
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
+import shutil
 from pathlib import Path
 from utils.train_utils import (
     RecursiveMunch,
@@ -52,6 +53,8 @@ def main(exp_name):
         # 初始化日志目录
         exp_dir = Path(__file__).parent / "logs" / exp_name
         exp_dir.mkdir(parents=True, exist_ok=True)
+        config_dir = exp_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
 
         # 初始化logger和writer
         logger = init_logger(log_file=exp_dir / "train.log")
@@ -59,6 +62,10 @@ def main(exp_name):
 
         logger.info(f"World size: {world_size}, Local rank: {local_rank}")
         logger.info(f"Experiment directory: {exp_dir}")
+        
+        # 存储args
+        shutil.copy(config_path, config_dir / "train_config.yaml")
+        shutil.copy(components_config, config_dir / "components.yaml")
 
     # 创建trainer并开始训练
     trainer = Trainer(
