@@ -188,6 +188,10 @@ class AdaLN(torch.nn.Module):
 
 
 def unpad(mask, *l):
+    '''
+    mask -> [b, t]
+    l里的每一个元素，形状要是[b,t,....]
+    '''
     lst = list()
     for x in l:  #  text_ids, speech_feat,valid_T
         if x is None:
@@ -195,6 +199,12 @@ def unpad(mask, *l):
         else:
             if len(x.shape) == 2:
                 x = x.unsqueeze(-1)
+            '''
+            这里x-> [b*t,...]，
+            indices记录了当前批次所有非mask的元素在x中的索引
+            cu_lens记录了当前批次每个样本的非mask的元素的数量
+            max_len记录了当前批次所有样本的非mask的元素的最大数量
+            '''
             x, indices, cu_lens, max_len = unpad_input(x, mask)[:4]
             x = x.squeeze(-1)
             lst.append(x)
