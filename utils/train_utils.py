@@ -251,7 +251,7 @@ def log_per_step(writer, args, step, epoch):
     # 按照指定间隔打印日志
     if (batch_idx + 1) % log_interval == 0:
         # 构建基础日志信息
-        log_str = f"{tag} Batch {epoch}/{batch_idx + 1} "
+        log_str = f"{tag} Batch {epoch}/{batch_idx + 1} Total step {step + 1}"
 
         # 添加所有损失值
         for name, value in loss_dict.items():
