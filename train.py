@@ -38,7 +38,7 @@ def main(exp_name):
         components = load_hyperpyyaml(f)
     args = RecursiveMunch(args)
     components = RecursiveMunch(components)
-    args.train_conf.exp_name = exp_name
+    args.exp_name = exp_name
     args.components = components
     # 初始化环境
     init_env(args)

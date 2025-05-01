@@ -371,6 +371,10 @@ class Trainer:
     def _load_checkpoint_file(self, ckpt_path, model, optimizer):
         """实际加载检查点的辅助函数"""
         ckpt_state = torch.load(ckpt_path, map_location="cpu")
+        if 'model' in ckpt_state:
+            weight_dict = ckpt_state['model']
+        else:
+            weight_dict = ckpt_state
         dict_state = {}
         model_state = (
             model.module.state_dict() if isinstance(model, DDP) else model.state_dict()
@@ -378,8 +382,8 @@ class Trainer:
 
         for k, v in model_state.items():
             try:
-                dict_state[k] = ckpt_state[k]
-                assert ckpt_state[k].shape == v.shape, (ckpt_state[k].shape, v.shape)
+                dict_state[k] = weight_dict[k]
+                assert weight_dict[k].shape == v.shape, (weight_dict[k].shape, v.shape)
             except:
                 if self.rank == 0:
                     self.logger.warning(f"{k} shape mismatch")
@@ -390,11 +394,11 @@ class Trainer:
         else:
             model.load_state_dict(dict_state, strict=True)
 
-        if hasattr(ckpt_state, "optimizer") and optimizer is not None:
+        if 'optimizer' in ckpt_state and optimizer is not None:
             optimizer.load_state_dict(ckpt_state["optimizer"])
 
-        if hasattr(ckpt_state, "step"):
+        if 'step' in ckpt_state:
             self.step = ckpt_state["step"]
 
-        if hasattr(ckpt_state, "epoch"):
+        if 'epoch' in ckpt_state:
             self.epoch = ckpt_state["epoch"]
