@@ -290,7 +290,7 @@ class Trainer:
             return
 
         # 构建保存路径
-        save_dir = Path(f"logs/{self.args.train_conf.exp_name}/checkpoints")
+        save_dir = Path(f"logs/{self.args.exp_name}/checkpoints")
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # 根据保存策略确定文件名
