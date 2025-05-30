@@ -21,6 +21,7 @@ import logging
 import math
 import warnings
 import torch
+import numpy as np
 from torch.optim.lr_scheduler import _LRScheduler
 
 
@@ -46,6 +47,7 @@ def create_scheduler(
             - warmup_cosine: 带预热的余弦退火
             - warmup_hold: 带保持期的预热调度器
             - step: 步进式调度器
+            - cosine_ten_k: 前10000步余弦衰减到0.1，然后保持不变
         num_training_steps: 总训练步数(某些调度器需要)
         last_epoch: 当前训练步数
         **kwargs: 调度器特定的参数
@@ -158,6 +160,13 @@ def create_scheduler(
             optimizer,
             step_size=step_size,
             gamma=gamma
+        )
+        
+    elif scheduler_type == "cosine_ten_k":
+        # 前10000步余弦衰减到0.1，然后保持不变
+        scheduler = CosineTenKScheduler(
+            optimizer,
+            last_epoch=last_epoch,
         )
         
     else:
@@ -880,5 +889,37 @@ class ConstantLR(_LRScheduler):
     def get_lr(self):
         return self.base_lrs
 
+    def set_step(self, step: int):
+        self.last_epoch = step
+
+
+class CosineTenKScheduler(_LRScheduler):
+    """前10000步余弦衰减到0.1的调度器
+
+    学习率从初始值线性衰减到初始值的0.1倍，遵循公式:
+    lr = initial_lr * ((cos(min(step/10000, 1) * π)/2 + 0.5) * 0.9 + 0.1)
+
+    在前10000步内学习率从1.0降到0.1，之后保持不变。
+    """
+
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        last_epoch: int = -1,
+    ):
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        if not self._get_lr_called_within_step:
+            warnings.warn(
+                "To get the last learning rate computed "
+                "by the scheduler, please use `get_last_lr()`.",
+                UserWarning,
+                stacklevel=2)
+
+        step = self.last_epoch
+        lr_rate = (np.cos(min(step/10000, 1) * np.pi)/2 + 0.5) * 0.9 + 0.1
+        return [base_lr * lr_rate for base_lr in self.base_lrs]
+    
     def set_step(self, step: int):
         self.last_epoch = step
