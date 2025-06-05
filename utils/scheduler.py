@@ -89,6 +89,7 @@ def create_scheduler(
     warmup_steps = kwargs.get("warmup_steps", 0)
     warmup_ratio = kwargs.get("warmup_ratio", None)
     min_lr = kwargs.get("min_lr", 0.0)
+    cos_max_step = kwargs.get("max_step", 10000)
     
     # 如果指定了warmup_ratio，计算warmup_steps
     if warmup_ratio is not None and num_training_steps is not None:
@@ -166,6 +167,7 @@ def create_scheduler(
         # 前10000步余弦衰减到0.1，然后保持不变
         scheduler = CosineTenKScheduler(
             optimizer,
+            max_step=cos_max_step,
             last_epoch=last_epoch,
         )
         
@@ -905,9 +907,11 @@ class CosineTenKScheduler(_LRScheduler):
     def __init__(
         self,
         optimizer: torch.optim.Optimizer,
+        max_step: int = 10000,
         last_epoch: int = -1,
     ):
         super().__init__(optimizer, last_epoch)
+        self.max_step = max_step
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
@@ -918,7 +922,7 @@ class CosineTenKScheduler(_LRScheduler):
                 stacklevel=2)
 
         step = self.last_epoch
-        lr_rate = (np.cos(min(step/10000, 1) * np.pi)/2 + 0.5) * 0.9 + 0.1
+        lr_rate = (np.cos(min(step/self.max_step, 1) * np.pi)/2 + 0.5) * 0.9 + 0.1
         return [base_lr * lr_rate for base_lr in self.base_lrs]
     
     def set_step(self, step: int):
