@@ -1,0 +1,17 @@
+# fixed params
+sample_rate: 16000
+
+# 数据管道
+data_process: !name:dataset.process_segment_cosy_dialect_1f1b.data_process
+
+shuffle: !name:dataset.process_segment_cosy_dialect_1f1b.shuffle
+
+batch: !name:dataset.process_segment_cosy_dialect_1f1b.batch
+padding: !name:dataset.process_segment_cosy_dialect_1f1b.padding
+
+data_pipeline: [
+    !ref <data_process>,
+    !ref <shuffle>,
+    !ref <batch>,
+    !ref <padding>
+]

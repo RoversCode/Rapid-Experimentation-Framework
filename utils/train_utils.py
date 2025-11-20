@@ -61,6 +61,16 @@ class RecursiveMunch(Munch):
             ]
         super().__setattr__(k, v)
 
+    def __getattr__(self, k: str) -> None:
+        # 这个方法只有在正常属性查找失败后才会被调用
+        # 首先尝试从父类获取属性
+        try:
+            return super().__getattr__(k)
+        except (AttributeError, KeyError):
+            # 如果父类也找不到该属性，则返回None
+            return None
+
+
 
 def init_logger(
     log_file=None,
@@ -272,6 +282,7 @@ def init_dataset_and_dataloader(args):
     """
     if args.train_conf.queue_flag:
         # args 启动参数   configs 配置文件
+        from dataset.queue_dataset import QueueDatasetPipeline
         train_dataset = QueueDatasetPipeline(
             queue_configs=args.data_conf.queue_configs,
             data_pipeline=args.components.data_pipeline,
@@ -300,6 +311,7 @@ def init_dataset_and_dataloader(args):
             prefetch_factor=args.data_conf.prefetch,
         )
         
+        
         # cv_data_loader = DataLoader(
         #     cv_dataset,
         #     batch_size=None,
@@ -309,4 +321,36 @@ def init_dataset_and_dataloader(args):
         # )
         return train_data_loader, train_dataset, None, None
     else:  # TODO: @ljj: 微调走向
-        pass
+        from dataset.dataset import Dataset
+        train_dataset = Dataset(
+            data_list_file=args.train_conf.train_data_path,
+            data_pipeline=args.components.data_pipeline,
+            data_conf=args.data_conf,
+            mode="train",
+            shuffle=True,
+            partition=True,
+        )
+        train_data_loader = DataLoader(
+            train_dataset,
+            batch_size=None,
+            pin_memory=args.data_conf.pin_memory,
+            num_workers=args.data_conf.num_workers,
+            prefetch_factor=args.data_conf.prefetch,
+        )
+            
+        cv_dataset = Dataset(
+            data_list_file=args.train_conf.dev_data_path,
+            data_pipeline=args.components.data_pipeline,
+            data_conf=args.data_conf,
+            mode="inference",
+            shuffle=False,
+            partition=False,
+        )
+        cv_data_loader = DataLoader(
+            cv_dataset,
+            batch_size=None,
+            pin_memory=args.data_conf.pin_memory,
+            num_workers=args.data_conf.num_workers,
+            prefetch_factor=args.data_conf.prefetch,
+        )
+        return train_data_loader, train_dataset, cv_data_loader, cv_dataset
