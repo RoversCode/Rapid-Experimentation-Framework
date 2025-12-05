@@ -342,8 +342,12 @@ class Trainer:
                     ckpt.unlink()
                     self.logger.info(f"Removed old checkpoint: {ckpt}")
 
-    def load_checkpoint(self, model, optimizer=None):
-        """加载检查点，优先使用指定路径，其次查找最新检查点"""
+    def load_checkpoint(
+        self,
+        modules: dict,
+        optimizers: dict | None = None,
+    ):
+        """加载检查点，支持任意多个模型和优化器"""
         # 首先检查指定的检查点路径
         if (
             hasattr(self.args.train_conf, "ckpt_path")
@@ -351,7 +355,7 @@ class Trainer:
         ):
             ckpt_path = Path(self.args.train_conf.ckpt_path)
             if ckpt_path.exists():
-                self._load_checkpoint_file(ckpt_path, model, optimizer)
+                self._load_checkpoint_file(ckpt_path, modules, optimizers)
                 return
 
         # 查找最新的检查点
@@ -359,46 +363,70 @@ class Trainer:
         if checkpoint_dir.exists():
             checkpoint_files = list(checkpoint_dir.glob("*.pt"))
             if checkpoint_files:
-                # 按修改时间排序，获取最新的检查点
                 latest_checkpoint = max(
                     checkpoint_files, key=lambda x: os.path.getmtime(x)
                 )
-                self._load_checkpoint_file(latest_checkpoint, model, optimizer)
+                print("加载了最新的权重")
+                self._load_checkpoint_file(latest_checkpoint, modules, optimizers)
                 return
+
         if self.rank == 0:
-            self.logger.info(f"ljj：没有加载预训练模型，从头训练")
+            self.logger.info("ljj：没有加载预训练模型，从头训练")
 
-    def _load_checkpoint_file(self, ckpt_path, model, optimizer):
-        """实际加载检查点的辅助函数"""
+    def _load_checkpoint_file(self, ckpt_path, modules: dict, optimizers: dict | None):
+        """实际加载检查点的辅助函数，支持任意多个模块/优化器"""
         ckpt_state = torch.load(ckpt_path, map_location="cpu")
-        if 'model' in ckpt_state:
-            weight_dict = ckpt_state['model']
-        else:
-            weight_dict = ckpt_state
-        dict_state = {}
-        model_state = (
-            model.module.state_dict() if isinstance(model, DDP) else model.state_dict()
-        )
 
-        for k, v in model_state.items():
-            try:
-                dict_state[k] = weight_dict[k]
-                assert weight_dict[k].shape == v.shape, (weight_dict[k].shape, v.shape)
-            except:
-                if self.rank == 0:
-                    self.logger.warning(f"{k} shape mismatch")
-                dict_state[k] = v
+        # ====== 1. 先加载所有模型模块 ======
+        for name, module in modules.items():
+            # 当前模型自身的 state_dict（支持 DDP）
+            current_state = (
+                module.module.state_dict()
+                if isinstance(module, DDP)
+                else module.state_dict()
+            )
 
-        if hasattr(model, "module"):
-            model.module.load_state_dict(dict_state, strict=True)
-        else:
-            model.load_state_dict(dict_state, strict=True)
+            if name in ckpt_state:
+                weight_dict = ckpt_state[name]
+            else:
+                self.logger.error(f"ljj: 加载检查点失败，{name}在ckpt 不存在，注意检查是否符合期望")
+                weight_dict = current_state
 
-        if 'optimizer' in ckpt_state and optimizer is not None:
-            optimizer.load_state_dict(ckpt_state["optimizer"])
+            # 做逐参数 shape 检查与填充
+            new_state = {}
+            for k, v in current_state.items():
+                try:
+                    w = weight_dict[k]
+                    assert w.shape == v.shape, (w.shape, v.shape)
+                    new_state[k] = w
+                except Exception:
+                    if self.rank == 0:
+                        self.logger.warning(f"{name}.{k} shape mismatch")
+                    new_state[k] = v
 
-        if 'step' in ckpt_state:
+            # 真正 load 回去
+            if hasattr(module, "module"):
+                module.module.load_state_dict(new_state, strict=True)
+            else:
+                module.load_state_dict(new_state, strict=True)
+
+        # ====== 2. 再加载所有优化器（可选） ======
+        if optimizers is not None:
+            for name, opt in optimizers.items():
+                if opt is None:
+                    continue
+
+                state = None
+                if name in ckpt_state:
+                    state = ckpt_state[name]
+                else:
+                    self.logger.error(f"ljj: 加载优化器检查点失败，{name}在ckpt_state 不存在，注意检查是否符合期望")
+                    continue
+                opt.load_state_dict(state)
+
+        # ====== 3. step / epoch ======
+        if "step" in ckpt_state:
             self.step = ckpt_state["step"]
 
-        if 'epoch' in ckpt_state:
+        if "epoch" in ckpt_state:
             self.epoch = ckpt_state["epoch"]
